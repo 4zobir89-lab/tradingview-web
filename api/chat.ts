@@ -37,68 +37,33 @@ const TRADING_SYSTEM_PROMPT = `أنت TradeX AI، خبير التداول وال
 - وقف الخسارة وجني الأرباح
 - تنبيه المخاطر`
 
-function calcRSI(closes: number[], period = 14): number[] {
-  if (closes.length < period + 1) return [50]
-  const rsi: number[] = []
-  let gains = 0, losses = 0
-  for (let i = 1; i <= period; i++) {
-    const diff = closes[i] - closes[i - 1]
-    if (diff > 0) gains += diff; else losses -= diff
-  }
-  let avgGain = gains / period
-  let avgLoss = losses / period
-  rsi.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss))
-  for (let i = period + 1; i < closes.length; i++) {
-    const diff = closes[i] - closes[i - 1]
-    avgGain = (avgGain * (period - 1) + (diff > 0 ? diff : 0)) / period
-    avgLoss = (avgLoss * (period - 1) + (diff < 0 ? -diff : 0)) / period
-    rsi.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss))
-  }
-  return rsi
-}
-
-function calcEMA(data: number[], period: number): number[] {
-  if (data.length === 0) return [0]
-  const k = 2 / (period + 1)
-  const out: number[] = [data[0]]
-  for (let i = 1; i < data.length; i++) out.push(data[i] * k + out[i - 1] * (1 - k))
-  return out
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { message, symbol = 'BTC-USD', model = 'deepseek-v4-flash-free' } = req.body || {}
+  const { message, symbol = 'BTC-USD', model = 'deepseek-v4-flash-free', marketContext: clientContext = '' } = req.body || {}
 
   if (!message) {
     return res.status(400).json({ error: 'Message required' })
   }
 
-  // Fetch real market context from Binance (server-side)
-  let marketContext = ''
-  try {
-    const binanceSym = symbol.toUpperCase().replace(/-USD$/, '').replace(/USDT$/, '') + 'USDT'
-    const [tickerRes, klinesRes] = await Promise.all([
-      fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${binanceSym}`).then(r => r.json()),
-      fetch(`https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=15m&limit=200`).then(r => r.json()),
-    ])
+  // Use market context from client (Binance CORS works from browser)
+  // Fallback: try server-side fetch if client didn't provide context
+  let marketContext = clientContext
+  if (!marketContext) {
+    try {
+      const binanceSym = symbol.toUpperCase().replace(/-USD$/, '').replace(/USDT$/, '') + 'USDT'
+      const tickerRes = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${binanceSym}`).then(r => r.json())
 
-    if (tickerRes.lastPrice) {
-      const price = parseFloat(tickerRes.lastPrice)
-      const change = parseFloat(tickerRes.priceChangePercent)
-      const high = parseFloat(tickerRes.highPrice)
-      const low = parseFloat(tickerRes.lowPrice)
-      const volume = parseFloat(tickerRes.quoteVolume)
+      if (tickerRes.lastPrice) {
+        const price = parseFloat(tickerRes.lastPrice)
+        const change = parseFloat(tickerRes.priceChangePercent)
+        const high = parseFloat(tickerRes.highPrice)
+        const low = parseFloat(tickerRes.lowPrice)
+        const volume = parseFloat(tickerRes.quoteVolume)
 
-      const closes = klinesRes.map((c: any[]) => parseFloat(c[4]))
-      const rsi = calcRSI(closes)
-      const lastRSI = rsi[rsi.length - 1] || 50
-      const ema20 = calcEMA(closes, 20)
-      const ema50 = calcEMA(closes, 50)
-
-      marketContext = `
+        marketContext = `
 
 === بيانات السوق اللحظية من Binance ===
 العملة: ${symbol}
@@ -108,15 +73,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 أدنى 24 ساعة: $${low.toLocaleString()}
 الحجم: $${(volume / 1e6).toFixed(1)}M
 
-المؤشرات الفنية:
-- RSI(14): ${lastRSI.toFixed(1)}
-- EMA20: $${ema20[ema20.length - 1].toLocaleString()}
-- EMA50: $${ema50[ema50.length - 1].toLocaleString()}
-
 ملاحظة: هذه بيانات لحظية حقيقية. استخدمها في تحليلك.`
+      }
+    } catch {
+      marketContext = '\n\n(لا تتوفر بيانات السوق حالياً)'
     }
-  } catch {
-    marketContext = '\n\n(لا تتوفر بيانات السوق حالياً)'
   }
 
   const messages = [

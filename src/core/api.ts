@@ -66,10 +66,45 @@ export const api = {
 
   // ── AI Chat (Vercel serverless function) ─────────────────────
   chat: async (message: string, symbol = 'BTC-USD', model = 'deepseek-v4-flash-free') => {
+    // Fetch market data client-side (Binance CORS works from browser, not always from Vercel)
+    let marketContext = ''
+    try {
+      const [ticker, analysis] = await Promise.all([
+        fetchTicker(symbol).catch(() => null),
+        analyzeSymbol(symbol).catch(() => null),
+      ])
+      if (ticker) {
+        marketContext = `\n\n=== بيانات السوق اللحظية من Binance ===
+العملة: ${symbol}
+السعر الحالي: $${ticker.price.toLocaleString()}
+التغيير 24 ساعة: ${ticker.changePct.toFixed(2)}%
+أعلى 24 ساعة: $${ticker.high24h.toLocaleString()}
+أدنى 24 ساعة: $${ticker.low24h.toLocaleString()}
+الحجم: $${(ticker.volume24h / 1e6).toFixed(1)}M`
+        if (analysis) {
+          marketContext += `
+
+المؤشرات الفنية:
+- RSI(14): ${analysis.indicators.rsi.toFixed(1)}
+- MACD Histogram: ${analysis.indicators.macd.histogram.toFixed(2)}
+- EMA20: $${analysis.indicators.ema20.toLocaleString()}
+- EMA50: $${analysis.indicators.ema50.toLocaleString()}
+- Bollinger Upper: $${analysis.indicators.bollinger.upper.toLocaleString()}
+- Bollinger Lower: $${analysis.indicators.bollinger.lower.toLocaleString()}
+- ADX: ${analysis.indicators.adx.toFixed(1)}
+- VWAP: $${analysis.indicators.vwap.toLocaleString()}
+- SuperTrend: $${analysis.indicators.superTrend.toLocaleString()}
+
+إشارة التحليل: ${analysis.signal} (النتيجة: ${analysis.score.toFixed(0)}%)
+ملاحظة: هذه بيانات لحظية حقيقية. استخدمها في تحليلك.`
+        }
+      }
+    } catch {}
+
     const r = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, symbol, model }),
+      body: JSON.stringify({ message, symbol, model, marketContext }),
     })
     if (!r.ok) throw new Error(`AI API ${r.status}`)
     return r.json()
