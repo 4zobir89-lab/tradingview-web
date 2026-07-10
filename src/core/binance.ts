@@ -292,3 +292,112 @@ export class MultiTickerStream {
     }
   }
 }
+
+/**
+ * Real-time kline (candle) stream via Binance WebSocket.
+ * The @kline stream pushes full candle updates on every trade —
+ * open, high, low, close, volume all update in real-time.
+ * This is what makes the chart truly "live".
+ */
+export interface KlineUpdate {
+  time: number          // candle start time (seconds)
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+  isClosed: boolean     // true when the candle is finalized
+  symbol: string
+}
+
+export class KlineStream {
+  private ws: WebSocket | null = null
+  private symbol: string
+  private interval: string
+  private handlers = new Set<(k: KlineUpdate) => void>()
+  private reconnectAttempts = 0
+  private reconnectTimer: number | null = null
+  private closed = false
+
+  constructor(input: string, interval: string) {
+    this.symbol = toBinanceSymbol(input)
+    this.interval = interval
+  }
+
+  connect() {
+    if (this.closed) return
+    const stream = `${this.symbol.toLowerCase()}@kline_${this.interval}`
+    const url = `wss://stream.binance.com:9443/ws/${stream}`
+    try {
+      this.ws = new WebSocket(url)
+    } catch {
+      this.scheduleReconnect()
+      return
+    }
+
+    this.ws.onopen = () => {
+      this.reconnectAttempts = 0
+    }
+
+    this.ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data)
+        const k = msg.k
+        if (!k) return
+        const update: KlineUpdate = {
+          time: Math.floor(k.t / 1000),
+          open: parseFloat(k.o),
+          high: parseFloat(k.h),
+          low: parseFloat(k.l),
+          close: parseFloat(k.c),
+          volume: parseFloat(k.v),
+          isClosed: Boolean(k.x),
+          symbol: msg.s,
+        }
+        this.handlers.forEach(h => h(update))
+      } catch {}
+    }
+
+    this.ws.onclose = () => {
+      if (!this.closed) this.scheduleReconnect()
+    }
+
+    this.ws.onerror = () => {
+      this.ws?.close()
+    }
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimer) return
+    this.reconnectAttempts++
+    const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 15000)
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null
+      this.connect()
+    }, delay)
+  }
+
+  on(cb: (k: KlineUpdate) => void): () => void {
+    this.handlers.add(cb)
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) this.connect()
+    return () => {
+      this.handlers.delete(cb)
+      if (this.handlers.size === 0) this.close()
+    }
+  }
+
+  close() {
+    this.closed = true
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+    if (this.ws) {
+      this.ws.onclose = null
+      this.ws.onerror = null
+      this.ws.onmessage = null
+      try { this.ws.close() } catch {}
+      this.ws = null
+    }
+  }
+}

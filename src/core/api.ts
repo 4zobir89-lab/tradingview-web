@@ -5,9 +5,9 @@
  */
 import {
   fetchTicker, fetchCandles, fetchOrderBook, fetchMultipleTickers,
-  TickerStream, MultiTickerStream,
+  TickerStream, MultiTickerStream, KlineStream,
   toBinanceSymbol, toBaseSymbol,
-  type Ticker, type Candle, type OrderBook,
+  type Ticker, type Candle, type OrderBook, type KlineUpdate,
 } from './binance'
 import { analyzeSymbol, scanMovers, SCANNER_UNIVERSE, type AnalysisResult, type ScanItem } from './analysis'
 import { fetchSentiment, fetchMarketOverview, fetchNews, type SentimentData, type MarketOverview, type NewsItem } from './external'
@@ -140,6 +140,28 @@ export function subscribeMultiTicker(symbols: string[], cb: (symbol: string, dat
     return multiStream!.subscribe(s, (data) => cb(toBinanceSymbol(s), data))
   })
   return () => unsubs.forEach(u => u())
+}
+
+// ── Real-time kline (candle) stream ─────────────────────────────
+const klineStreams = new Map<string, KlineStream>()
+
+/**
+ * Subscribe to real-time kline updates for a symbol+interval.
+ * This pushes full candle updates (OHLCV) on every trade —
+ * use it to make charts truly live.
+ */
+export function subscribeKline(
+  symbol: string,
+  interval: string,
+  cb: (k: KlineUpdate) => void
+): () => void {
+  const key = `${toBinanceSymbol(symbol)}_${interval}`
+  let stream = klineStreams.get(key)
+  if (!stream) {
+    stream = new KlineStream(symbol, interval)
+    klineStreams.set(key, stream)
+  }
+  return stream.on(cb)
 }
 
 // ── Backtest (client-side) ──────────────────────────────────────
