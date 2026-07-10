@@ -1,8 +1,9 @@
 /**
  * Vercel Serverless Function: News
  * Fetches and aggregates crypto news from multiple RSS feeds.
- * No API key required — uses public RSS feeds from CoinDesk, CoinTelegraph, etc.
+ * Uses Node.js style (req, res) for Vercel compatibility.
  */
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 interface NewsItem {
   title: string
@@ -45,7 +46,6 @@ function parseRSS(xml: string, source: string): NewsItem[] {
       categories.push(catMatch[1].trim())
     }
 
-    // Try to extract image from media:content or enclosure
     const imageUrl = block.match(/<media:content[^>]*url="([^"]+)"/)?.[1]
                    || block.match(/<enclosure[^>]*url="([^"]+)"/)?.[1]
                    || block.match(/<media:thumbnail[^>]*url="([^"]+)"/)?.[1]
@@ -56,7 +56,6 @@ function parseRSS(xml: string, source: string): NewsItem[] {
       if (!isNaN(d.getTime())) publishedAt = d.getTime()
     }
 
-    // Clean HTML from description
     const body = desc.replace(/<[^>]+>/g, '').trim().slice(0, 300)
 
     if (title && link) {
@@ -75,13 +74,8 @@ function parseRSS(xml: string, source: string): NewsItem[] {
   return items
 }
 
-export const config = {
-  maxDuration: 20,
-}
-
-export default async function handler(req: Request): Promise<Response> {
-  const url = new URL(req.url)
-  const limit = parseInt(url.searchParams.get('limit') || '30')
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const limit = parseInt((req.query.limit as string) || '30')
 
   try {
     const results = await Promise.all(
@@ -89,13 +83,13 @@ export default async function handler(req: Request): Promise<Response> {
         try {
           const ctrl = new AbortController()
           const t = setTimeout(() => ctrl.abort(), 8000)
-          const res = await fetch(feed.url, {
+          const fRes = await fetch(feed.url, {
             signal: ctrl.signal,
             headers: { 'User-Agent': 'TradeX/3.0 (+https://tradingview-web.vercel.app)' },
           })
           clearTimeout(t)
-          if (!res.ok) return []
-          const xml = await res.text()
+          if (!fRes.ok) return []
+          const xml = await fRes.text()
           return parseRSS(xml, feed.source)
         } catch {
           return []
@@ -108,18 +102,9 @@ export default async function handler(req: Request): Promise<Response> {
       .sort((a, b) => b.publishedAt - a.publishedAt)
       .slice(0, limit)
 
-    // Cache for 5 minutes
-    return new Response(JSON.stringify(allNews), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
-      },
-    })
-  } catch (e: any) {
-    return new Response(JSON.stringify([]), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600')
+    return res.status(200).json(allNews)
+  } catch {
+    return res.status(200).json([])
   }
 }

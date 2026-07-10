@@ -1,10 +1,9 @@
 /**
  * Vercel Serverless Function: AI Chat
- * Protects the AI API key by keeping it server-side.
- * Set these env vars in Vercel project settings:
- *   - AI_API_KEY
- *   - AI_API_URL (optional, defaults to OpenCode)
+ * Uses Node.js style (req, res) for maximum Vercel compatibility.
+ * Set env vars in Vercel: AI_API_KEY, AI_API_URL
  */
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const AI_API_KEY = process.env.AI_API_KEY || ''
 const AI_API_URL = process.env.AI_API_URL || 'https://opencode.ai/zen/v1/chat/completions'
@@ -38,34 +37,46 @@ const TRADING_SYSTEM_PROMPT = `أنت TradeX AI، خبير التداول وال
 - وقف الخسارة وجني الأرباح
 - تنبيه المخاطر`
 
-interface ChatBody {
-  message: string
-  symbol?: string
-  model?: string
+function calcRSI(closes: number[], period = 14): number[] {
+  if (closes.length < period + 1) return [50]
+  const rsi: number[] = []
+  let gains = 0, losses = 0
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1]
+    if (diff > 0) gains += diff; else losses -= diff
+  }
+  let avgGain = gains / period
+  let avgLoss = losses / period
+  rsi.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss))
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1]
+    avgGain = (avgGain * (period - 1) + (diff > 0 ? diff : 0)) / period
+    avgLoss = (avgLoss * (period - 1) + (diff < 0 ? -diff : 0)) / period
+    rsi.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss))
+  }
+  return rsi
 }
 
-export const config = {
-  maxDuration: 45,
+function calcEMA(data: number[], period: number): number[] {
+  if (data.length === 0) return [0]
+  const k = 2 / (period + 1)
+  const out: number[] = [data[0]]
+  for (let i = 1; i < data.length; i++) out.push(data[i] * k + out[i - 1] * (1 - k))
+  return out
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { message, symbol = 'BTC-USD', model = 'deepseek-v4-flash-free' } = (await req.json()) as ChatBody
+  const { message, symbol = 'BTC-USD', model = 'deepseek-v4-flash-free' } = req.body || {}
 
   if (!message) {
-    return new Response(JSON.stringify({ error: 'Message required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return res.status(400).json({ error: 'Message required' })
   }
 
-  // Try to fetch real market context from Binance (server-side, no CORS issue)
+  // Fetch real market context from Binance (server-side)
   let marketContext = ''
   try {
     const binanceSym = symbol.toUpperCase().replace(/-USD$/, '').replace(/USDT$/, '') + 'USDT'
@@ -81,12 +92,9 @@ export default async function handler(req: Request): Promise<Response> {
       const low = parseFloat(tickerRes.lowPrice)
       const volume = parseFloat(tickerRes.quoteVolume)
 
-      // Quick RSI
       const closes = klinesRes.map((c: any[]) => parseFloat(c[4]))
       const rsi = calcRSI(closes)
       const lastRSI = rsi[rsi.length - 1] || 50
-
-      // Quick EMA
       const ema20 = calcEMA(closes, 20)
       const ema50 = calcEMA(closes, 50)
 
@@ -121,7 +129,7 @@ export default async function handler(req: Request): Promise<Response> {
     const ctrl = new AbortController()
     const timeout = setTimeout(() => ctrl.abort(), 40000)
 
-    const res = await fetch(AI_API_URL, {
+    const aiRes = await fetch(AI_API_URL, {
       method: 'POST',
       signal: ctrl.signal,
       headers: {
@@ -138,61 +146,26 @@ export default async function handler(req: Request): Promise<Response> {
 
     clearTimeout(timeout)
 
-    if (!res.ok) {
-      const errBody = await res.text()
-      throw new Error(`AI API ${res.status}: ${errBody.slice(0, 200)}`)
+    if (!aiRes.ok) {
+      const errBody = await aiRes.text()
+      throw new Error(`AI API ${aiRes.status}: ${errBody.slice(0, 200)}`)
     }
 
-    const data = await res.json()
+    const data = await aiRes.json()
     const msg = data.choices?.[0]?.message
     const text = msg?.content?.trim() || msg?.reasoning_content?.trim()
 
-    return new Response(JSON.stringify({
+    return res.status(200).json({
       response: text || 'No response from AI',
       model,
       timestamp: new Date().toISOString(),
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
     })
   } catch (e: any) {
-    return new Response(JSON.stringify({
+    return res.status(200).json({
       response: `⚠️ عذراً، لا أستطيع الاتصال بخدمة الذكاء الاصطناعي حالياً.\n\nلكن يمكنني مساعدتك:\n\n• اكتب "تحليل BTC" لتحليل عملة بتكوين\n• اكتب "مؤشرات" لرؤية المؤشرات الفنية\n• اكتب "استراتيجية" لاقتراح استراتيجية\n• اكتب "مساعدة" لرؤية جميع الأوامر`,
       model: 'fallback',
       error: e.message,
       timestamp: new Date().toISOString(),
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
     })
   }
-}
-
-// ── Helper: RSI (server-side) ──────────────────────────────────
-function calcRSI(closes: number[], period = 14): number[] {
-  if (closes.length < period + 1) return [50]
-  const rsi: number[] = []
-  let gains = 0, losses = 0
-  for (let i = 1; i <= period; i++) {
-    const diff = closes[i] - closes[i - 1]
-    if (diff > 0) gains += diff; else losses -= diff
-  }
-  let avgGain = gains / period
-  let avgLoss = losses / period
-  rsi.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss))
-  for (let i = period + 1; i < closes.length; i++) {
-    const diff = closes[i] - closes[i - 1]
-    avgGain = (avgGain * (period - 1) + (diff > 0 ? diff : 0)) / period
-    avgLoss = (avgLoss * (period - 1) + (diff < 0 ? -diff : 0)) / period
-    rsi.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss))
-  }
-  return rsi
-}
-
-function calcEMA(data: number[], period: number): number[] {
-  if (data.length === 0) return [0]
-  const k = 2 / (period + 1)
-  const out: number[] = [data[0]]
-  for (let i = 1; i < data.length; i++) out.push(data[i] * k + out[i - 1] * (1 - k))
-  return out
 }
