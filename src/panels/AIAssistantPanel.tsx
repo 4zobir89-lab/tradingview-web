@@ -19,12 +19,13 @@ const MODELS = [
   { id: 'deepseek-v4-flash-free', name: 'DeepSeek', icon: '⚡' },
   { id: 'mimo-v2.5-free', name: 'MiMo', icon: '🤖' },
   { id: 'big-pickle', name: 'Big Pickle', icon: '🥒' },
+  { id: 'nemotron-3-ultra-free', name: 'Nemotron', icon: '🧠' },
 ]
 
 function uid() { return Math.random().toString(36).slice(2, 10) }
 
 function formatTime(ts: number) {
-  return new Date(ts).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })
+  return new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
 export default function AIAssistantPanel({ symbol }: { symbol: string }) {

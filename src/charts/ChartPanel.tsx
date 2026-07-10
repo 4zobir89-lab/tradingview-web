@@ -84,7 +84,7 @@ export default function ChartPanel({ symbol }: ChartProps) {
         borderDownColor: '#ef4444', borderUpColor: '#22c55e',
         wickDownColor: '#ef4444', wickUpColor: '#22c55e',
       })
-      cs.setData(candles)
+      cs.setData(candles.map(c => ({ ...c, time: c.time as any })))
       seriesRef.current = cs
 
       // Volume
@@ -133,20 +133,20 @@ export default function ChartPanel({ symbol }: ChartProps) {
   // Real-time updates via WebSocket
   useEffect(() => {
     const unsub = subscribeTicker(symbol, (data) => {
-      setTicker((prev: any) => prev ? { ...prev, price: data.price, change_pct: data.change_pct } : prev)
+      setTicker((prev: any) => prev ? { ...prev, price: data.price, changePct: data.changePct } : prev)
       // Update last candle
       if (seriesRef.current && lastCandle) {
         const now = Math.floor(Date.now() / 1000)
-        const tfSec = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 }[timeframe] || 900
-        const candleTime = Math.floor(now / tfSec) * tfSec
+        const tfSec: Record<string, number> = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400, '1w': 604800, '1M': 2592000 }
+        const candleTime = Math.floor(now / (tfSec[timeframe] || 900)) * (tfSec[timeframe] || 900)
         if (candleTime === lastCandle.time) {
           // Update current candle
-          const updated = { ...lastCandle, close: data.price, high: Math.max(lastCandle.high, data.price), low: Math.min(lastCandle.low, data.price) }
+          const updated = { ...lastCandle, close: data.price ?? lastCandle.close, high: Math.max(lastCandle.high, data.price ?? 0), low: Math.min(lastCandle.low, data.price ?? 0) }
           seriesRef.current.update(updated)
           setLastCandle(updated)
         } else if (candleTime > lastCandle.time) {
           // New candle
-          const newCandle = { time: candleTime as any, open: lastCandle.close, high: data.price, low: data.price, close: data.price, volume: 0 }
+          const newCandle = { time: candleTime as any, open: lastCandle.close, high: data.price ?? 0, low: data.price ?? 0, close: data.price ?? 0, volume: 0 }
           seriesRef.current.update(newCandle)
           setLastCandle(newCandle)
         }
@@ -155,7 +155,7 @@ export default function ChartPanel({ symbol }: ChartProps) {
     return unsub
   }, [symbol, timeframe, lastCandle])
 
-  const changePct = ticker?.change_pct ?? 0
+  const changePct = ticker?.changePct ?? 0
   const isUp = changePct >= 0
 
   return (
@@ -166,7 +166,7 @@ export default function ChartPanel({ symbol }: ChartProps) {
           {ticker && (
             <>
               <span className="chart-price" style={{ color: isUp ? 'var(--green)' : 'var(--red)' }}>
-                ${Number(ticker.price || ticker.lastPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                ${Number(ticker.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </span>
               <span className={`chart-change ${isUp ? 'up' : 'down'}`}>
                 {isUp ? '+' : ''}{changePct.toFixed(2)}%

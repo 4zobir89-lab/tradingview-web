@@ -22,7 +22,7 @@ export default function BacktestPanel({ symbol }: { symbol: string }) {
   const run = async () => {
     setRunning(true)
     try {
-      const data = await api.backtest({ symbol, exchange: 'BINANCE', strategy, timeframe, period: 200 })
+      const data = await api.backtest({ symbol, strategy, timeframe, period: 200 })
       setResults(data)
 
       if (equityRef.current && !chartRef.current) {

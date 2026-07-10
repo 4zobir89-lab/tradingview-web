@@ -98,7 +98,10 @@ function PortfolioPanel() {
   const tt = useT()
   return (
     <div className="panel">
-      <div className="panel-head"><h3>{tt('nav.portfolio')}</h3></div>
+      <div className="panel-head">
+        <h3>{tt('nav.portfolio')}</h3>
+        <span className="badge badge-y">Demo</span>
+      </div>
       <div className="panel-body">
         <div className="dash-grid">
           {[
@@ -113,29 +116,8 @@ function PortfolioPanel() {
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 16 }}>
-          <div className="dash-label" style={{ marginBottom: 8 }}>Open Positions</div>
-          <div className="table-wrap">
-            <table className="t">
-              <thead><tr><th>Symbol</th><th>Side</th><th>Size</th><th>Entry</th><th>Mark</th><th>P&L</th></tr></thead>
-              <tbody>
-                {[
-                  { s: 'BTC', side: 'Long', size: '0.5', entry: '64,200', mark: '65,100', pnl: '+$450' },
-                  { s: 'ETH', side: 'Long', size: '5.0', entry: '3,400', mark: '3,380', pnl: '-$100' },
-                  { s: 'SOL', side: 'Short', size: '50', entry: '180', mark: '175', pnl: '+$250' },
-                ].map(p => (
-                  <tr key={p.s}>
-                    <td style={{ fontWeight: 600 }}>{p.s}</td>
-                    <td><span className={`badge ${p.side === 'Long' ? 'badge-g' : 'badge-r'}`}>{p.side}</span></td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>{p.size}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>${p.entry}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>${p.mark}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: p.pnl.startsWith('+') ? 'var(--green)' : 'var(--red)' }}>{p.pnl}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-2)', border: '1px solid var(--border-1)', borderRadius: 'var(--radius-md)', fontSize: 12, color: 'var(--text-3)' }}>
+          ⚡ This is a demo portfolio. Connect your exchange API keys in Settings to track real positions.
         </div>
       </div>
     </div>

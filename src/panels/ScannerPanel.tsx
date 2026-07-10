@@ -10,12 +10,9 @@ export default function ScannerPanel() {
 
   useEffect(() => {
     setLoading(true)
-    api.gainers('BINANCE', '15m', 20)
-      .then(d => {
-        let data = Array.isArray(d) ? d : []
-        if (scanType === 'losers') data = data.sort((a, b) => a.changePercent - b.changePercent)
-        else if (scanType === 'gainers') data = data.sort((a, b) => b.changePercent - a.changePercent)
-        else data = data.sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
+    api.scanAll()
+      .then(({ all, gainers, losers }) => {
+        let data = scanType === 'losers' ? losers : scanType === 'gainers' ? gainers : all
         setResults(data.slice(0, 20))
         setLoading(false)
       })
@@ -64,9 +61,9 @@ export default function ScannerPanel() {
               </thead>
               <tbody>
                 {results.map((item, i) => {
-                  const ch = item.changePercent ?? 0
+                  const ch = item.changePct ?? 0
                   const isUp = ch >= 0
-                  const sym = (item.symbol || '').replace('USDT', '')
+                  const sym = item.base || (item.symbol || '').replace('USDT', '')
                   return (
                     <tr key={item.symbol || i}>
                       <td style={{ color: 'var(--text-4)' }}>{i + 1}</td>

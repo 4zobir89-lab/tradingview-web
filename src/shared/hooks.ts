@@ -5,20 +5,20 @@ import type { Theme, Locale } from '../types'
 
 export function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState(getTheme)
-  useEffect(() => onThemeChange(() => setTheme(getTheme)), [])
+  useEffect(() => { onThemeChange(() => setTheme(getTheme)); return () => {} }, [])
   return [theme, toggleTheme]
 }
 
 export function useLocale(): [Locale, (l: Locale) => void, () => void] {
   const [locale, setLoc] = useState(getLocale)
   const change = useCallback((l: Locale) => { setLocale(l); setLoc(l) }, [])
-  useEffect(() => onLocaleChange(() => setLoc(getLocale())), [])
+  useEffect(() => { onLocaleChange(() => setLoc(getLocale())); return () => {} }, [])
   return [locale, change, getDirection]
 }
 
 export function useT() {
   const [, forceUpdate] = useState(0)
-  useEffect(() => onLocaleChange(() => forceUpdate(n => n + 1)), [])
+  useEffect(() => { onLocaleChange(() => forceUpdate(n => n + 1)); return () => {} }, [])
   return t
 }
 

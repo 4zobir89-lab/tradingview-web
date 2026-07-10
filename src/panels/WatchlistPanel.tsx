@@ -6,7 +6,7 @@ export default function WatchlistPanel({ symbol, onSelect }: { symbol: string; o
   const tt = useT()
   const [items, setItems] = useState<Map<string, any>>(new Map())
   const [loading, setLoading] = useState(true)
-  const symbols = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'BNB-USD', 'XRP-USD', 'ADA-USD', 'DOGE-USD', 'DOT-USD', 'AVAX-USD', 'LINK-USD', 'MATIC-USD', 'UNI-USD', 'LTC-USD', 'ATOM-USD', 'NEAR-USD', 'APT-USD', 'ARBUSDT', 'OPUSDT']
+  const symbols = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'BNB-USD', 'XRP-USD', 'ADA-USD', 'DOGE-USD', 'DOT-USD', 'AVAX-USD', 'LINK-USD', 'LTC-USD', 'ATOM-USD', 'NEAR-USD', 'APT-USD', 'ARB-USD', 'OP-USD', 'FIL-USD', 'INJ-USD']
 
   // Initial load
   useEffect(() => {
@@ -15,7 +15,7 @@ export default function WatchlistPanel({ symbol, onSelect }: { symbol: string; o
       .then(results => {
         if (!mounted) return
         const map = new Map<string, any>()
-        results.forEach((r, i) => { if (r && !r.error) map.set(symbols[i], { ...r, _sym: symbols[i] }) })
+        results.forEach((r, i) => { if (r) map.set(symbols[i], { ...r, _sym: symbols[i] }) })
         setItems(map)
         setLoading(false)
       })
@@ -29,7 +29,7 @@ export default function WatchlistPanel({ symbol, onSelect }: { symbol: string; o
         setItems(prev => {
           const next = new Map(prev)
           const existing = next.get(s)
-          if (existing) next.set(s, { ...existing, price: data.price, change_pct: data.change_pct, volume24h: data.volume24h })
+          if (existing) next.set(s, { ...existing, price: data.price, changePct: data.changePct, volume24h: data.volume24h })
           return next
         })
       })
@@ -41,8 +41,8 @@ export default function WatchlistPanel({ symbol, onSelect }: { symbol: string; o
     const itemA = items.get(a)
     const itemB = items.get(b)
     if (!itemA || !itemB) return 0
-    const volA = itemA.volume24h || itemA.quoteVolume || 0
-    const volB = itemB.volume24h || itemB.quoteVolume || 0
+    const volA = itemA.volume24h || 0
+    const volB = itemB.volume24h || 0
     return volB - volA
   })
 
@@ -81,8 +81,8 @@ export default function WatchlistPanel({ symbol, onSelect }: { symbol: string; o
                 {sortedSymbols.map(s => {
                   const item = items.get(s)
                   if (!item) return null
-                  const isUp = (item.change_pct ?? 0) >= 0
-                  const name = (item.symbol || s.split('-')[0]).replace('USDT', '')
+                  const isUp = (item.changePct ?? 0) >= 0
+                  const name = item.base || (item.symbol || s.split('-')[0]).replace('USDT', '')
                   return (
                     <tr key={s} onClick={() => onSelect(s)}
                       style={{ background: s === symbol ? 'var(--accent-subtle)' : undefined }}>
@@ -92,7 +92,7 @@ export default function WatchlistPanel({ symbol, onSelect }: { symbol: string; o
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <span className={`badge ${isUp ? 'badge-g' : 'badge-r'}`}>
-                          {isUp ? '+' : ''}{Number(item.change_pct ?? 0).toFixed(2)}%
+                          {isUp ? '+' : ''}{Number(item.changePct ?? 0).toFixed(2)}%
                         </span>
                       </td>
                       <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)' }}>

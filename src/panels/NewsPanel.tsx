@@ -1,27 +1,37 @@
 import { useState, useEffect } from 'react'
 import { api } from '../core/api'
 import { useT } from '../shared/hooks'
+import { formatRelative } from '../core/format'
 
 export default function NewsPanel() {
   const tt = useT()
   const [news, setNews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<string>('all')
 
   useEffect(() => {
-    api.news().then(d => {
-      const items = Array.isArray(d) ? d : Array.isArray(d?.news) ? d.news : Array.isArray(d?.items) ? d.items : []
-      setNews(items)
+    setLoading(true)
+    setError(null)
+    api.news().then(items => {
+      setNews(Array.isArray(items) ? items : [])
       setLoading(false)
-    }).catch(() => setLoading(false))
+    }).catch(e => {
+      setError(e.message)
+      setLoading(false)
+    })
   }, [])
 
+  const categories = ['all', ...new Set(news.flatMap(n => n.categories || []).slice(0, 8))]
+  const filtered = filter === 'all' ? news : news.filter(n => n.categories?.includes(filter))
+
   const sourceColors: Record<string, string> = {
-    'CryptoNews': 'var(--accent)',
     'CoinDesk': 'var(--green)',
+    'CoinTelegraph': 'var(--accent)',
     'Bloomberg': 'var(--purple)',
     'Reuters': 'var(--orange)',
-    'DefiLlama': 'var(--cyan)',
-    'The Block': 'var(--yellow)',
+    'CryptoCompare': 'var(--cyan)',
+    'Decrypt': 'var(--yellow)',
   }
 
   return (
@@ -33,26 +43,57 @@ export default function NewsPanel() {
           </svg>
           {tt('news.title')}
         </h3>
+        <span style={{ fontSize: 10, color: 'var(--text-4)' }}>{filtered.length} articles</span>
       </div>
-      <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {categories.length > 1 && (
+        <div className="news-filters">
+          {categories.slice(0, 6).map(cat => (
+            <button
+              key={cat}
+              className={`news-filter-chip ${filter === cat ? 'active' : ''}`}
+              onClick={() => setFilter(cat)}
+            >
+              {cat === 'all' ? 'All' : cat}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto' }}>
         {loading ? (
           <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)' }}>
             <div className="animate-pulse">{tt('common.loading')}</div>
           </div>
-        ) : news.length === 0 ? (
+        ) : error ? (
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--red)' }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>⚠️</div>
+            {error}
+          </div>
+        ) : filtered.length === 0 ? (
           <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)' }}>{tt('news.noNews')}</div>
         ) : (
-          news.slice(0, 20).map((item, i) => (
-            <div key={i} className="news-card">
-              <div className="news-title">{item.title || item.headline || 'Untitled'}</div>
-              <div className="news-meta">
-                <span style={{ color: sourceColors[item.source] || 'var(--accent)' }}>
-                  {item.source || item.publisher || ''}
-                </span>
-                <span>·</span>
-                <span>{item.published || item.date || ''}</span>
+          filtered.slice(0, 25).map((item, i) => (
+            <a
+              key={i}
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="news-card"
+            >
+              {item.imageUrl && (
+                <div className="news-thumb" style={{ backgroundImage: `url(${item.imageUrl})` }} />
+              )}
+              <div className="news-content">
+                <div className="news-title">{item.title}</div>
+                <div className="news-body">{item.body?.slice(0, 120)}...</div>
+                <div className="news-meta">
+                  <span style={{ color: sourceColors[item.source] || 'var(--accent)' }}>
+                    {item.source}
+                  </span>
+                  <span>·</span>
+                  <span>{formatRelative(item.publishedAt)}</span>
+                </div>
               </div>
-            </div>
+            </a>
           ))
         )}
       </div>
