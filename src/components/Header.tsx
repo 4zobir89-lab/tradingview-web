@@ -3,11 +3,15 @@ import { useTheme, useLocale, useT } from '../shared/hooks'
 import { fetchTicker } from '../core/binance'
 import { formatPrice, formatPct } from '../core/format'
 
-interface Props { activePanel: string; onPanelChange: (p: string) => void }
+interface Props {
+  activePanel: string
+  onPanelChange: (p: string) => void
+  onMenuClick?: () => void
+}
 
 const QUICK_SYMBOLS = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP']
 
-export default function Header({ activePanel, onPanelChange }: Props) {
+export default function Header({ activePanel, onPanelChange, onMenuClick }: Props) {
   const [theme, toggleTheme] = useTheme()
   const [locale, setLocale] = useLocale()
   const tt = useT()
@@ -54,6 +58,15 @@ export default function Header({ activePanel, onPanelChange }: Props) {
 
   return (
     <header className="app-header no-select">
+      {/* Mobile menu button (hamburger) */}
+      {onMenuClick && (
+        <button className="header-menu-btn" onClick={onMenuClick} aria-label="Menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M3 12h18M3 6h18M3 18h18" />
+          </svg>
+        </button>
+      )}
+
       {/* Logo */}
       <div className="header-logo" onClick={() => onPanelChange('chart')}>
         <div className="header-logo-icon">

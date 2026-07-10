@@ -623,6 +623,43 @@ body {
 .sidebar-btn:hover .sidebar-tip { display: block; }
 
 /* ═══════════════════════════════════════════════════════
+   MOBILE DRAWER (slide-out sidebar)
+   Hidden on desktop, slides in from left on mobile
+   ═══════════════════════════════════════════════════════ */
+
+.header-menu-btn {
+  display: none; /* hidden on desktop, shown on mobile via media query */
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--dur-fast) var(--ease);
+}
+
+.header-menu-btn:hover {
+  background: var(--bg-4);
+  color: var(--text-1);
+}
+
+.header-menu-btn:active {
+  transform: scale(0.92);
+}
+
+.sidebar-drawer {
+  display: none; /* hidden on desktop */
+}
+
+.drawer-backdrop {
+  display: none; /* hidden on desktop */
+}
+
+/* ═══════════════════════════════════════════════════════
    FOOTER
    ═══════════════════════════════════════════════════════ */
 
@@ -1613,6 +1650,135 @@ textarea.input {
   /* Hide sidebar and footer on mobile */
   .sidebar { display: none; }
   .app-footer { display: none; }
+
+  /* Show hamburger menu button on mobile */
+  .header-menu-btn {
+    display: flex;
+  }
+
+  /* Mobile drawer — slides in from the left */
+  .sidebar-drawer {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    background: var(--bg-2);
+    border-right: 1px solid var(--border-2);
+    z-index: var(--z-modal);
+    transform: translateX(-100%);
+    transition: transform var(--dur-slow) var(--ease);
+    overflow-y: auto;
+    box-shadow: var(--shadow-xl);
+  }
+
+  [dir="rtl"] .sidebar-drawer {
+    left: auto;
+    right: 0;
+    border-right: none;
+    border-left: 1px solid var(--border-2);
+    transform: translateX(100%);
+  }
+
+  .sidebar-drawer.open {
+    transform: translateX(0);
+  }
+
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-1);
+    background: var(--bg-2);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .drawer-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-0);
+  }
+
+  .drawer-close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-3);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--dur-fast) var(--ease);
+  }
+
+  .drawer-close:hover {
+    background: var(--bg-4);
+    color: var(--text-1);
+  }
+
+  .drawer-body {
+    flex: 1;
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .drawer-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-2);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--dur-fast) var(--ease);
+    text-align: start;
+    width: 100%;
+    min-height: 44px; /* iOS touch target */
+  }
+
+  .drawer-item:hover {
+    background: var(--bg-3);
+    color: var(--text-1);
+  }
+
+  .drawer-item:active {
+    transform: scale(0.98);
+  }
+
+  .drawer-item.active {
+    background: var(--accent-subtle);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .drawer-item svg {
+    flex-shrink: 0;
+  }
+
+  /* Backdrop dims the background when drawer is open */
+  .drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: var(--z-modal) - 1;
+    animation: fadeIn var(--dur-normal) var(--ease);
+    backdrop-filter: blur(2px);
+  }
 
   /* Main content fills remaining space, with bottom padding for fixed nav */
   .main-content {
