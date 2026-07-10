@@ -165,6 +165,10 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Critical: prevent content from expanding grid/flex containers beyond viewport.
+   This fixes the #1 responsive bug where wide tables/charts force horizontal overflow. */
+img, canvas, table, svg, video, pre, code { max-width: 100%; }
+
 html {
   height: 100%;
   width: 100%;
@@ -262,10 +266,13 @@ body {
 .app-layout {
   display: grid;
   grid-template-rows: 48px 1fr 28px;
-  grid-template-columns: 48px 1fr;
+  /* minmax(0, 1fr) prevents content from expanding the column beyond viewport */
+  grid-template-columns: 48px minmax(0, 1fr);
   height: 100vh; /* fallback */
   height: 100dvh; /* dynamic viewport — mobile browser chrome aware */
   width: 100%;
+  max-width: 100vw;
+  overflow: hidden;
   direction: ltr;
 }
 
@@ -713,7 +720,9 @@ body {
   overflow: hidden;
   position: relative;
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -726,6 +735,8 @@ body {
   height: 100%;
   overflow: hidden;
   background: var(--bg-1);
+  min-width: 0;
+  min-height: 0;
 }
 
 .panel-head {
@@ -750,7 +761,10 @@ body {
 .panel-body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--sp-3);
+  min-width: 0;
+  min-height: 0;
 }
 
 /* ── Tabs ──────────────────────────────────────────────── */
@@ -1014,6 +1028,9 @@ textarea.input {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .chart-header {
@@ -1025,18 +1042,22 @@ textarea.input {
   gap: var(--sp-4);
   flex-wrap: wrap;
   background: var(--bg-2);
+  min-width: 0;
 }
 
 .chart-header-left {
   display: flex;
   align-items: center;
   gap: var(--sp-4);
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .chart-header-right {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+  min-width: 0;
 }
 
 .chart-symbol {
@@ -1189,6 +1210,8 @@ textarea.input {
   flex: 1;
   position: relative;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .chart-overlay {
@@ -1642,14 +1665,72 @@ textarea.input {
 @media (max-width: 767px) {
   /* 2-row grid: header + content. No footer row (footer hidden). */
   .app-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 52px 1fr;
-    height: 100dvh; /* dynamic viewport height — handles mobile browser chrome */
+    height: 100dvh;
+    max-width: 100vw;
+    overflow: hidden;
   }
 
   /* Hide sidebar and footer on mobile */
   .sidebar { display: none; }
   .app-footer { display: none; }
+
+  /* Main content — prevent horizontal overflow */
+  .main-content {
+    grid-row: 2;
+    grid-column: 1;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+    max-width: 100%;
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Ensure all panels and their children respect container width */
+  .panel, .chart-panel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .panel-body {
+    overflow-x: hidden;
+    word-wrap: break-word;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Tables: allow horizontal scroll within their container, not the page */
+  .table-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+  table.t {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Chart canvas: must not expand beyond container */
+  .chart-canvas {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* Chart header: wrap properly */
+  .chart-header {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .chart-header-left, .chart-header-right {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
 
   /* Show hamburger menu button on mobile */
   .header-menu-btn {
@@ -1778,15 +1859,6 @@ textarea.input {
     z-index: var(--z-modal) - 1;
     animation: fadeIn var(--dur-normal) var(--ease);
     backdrop-filter: blur(2px);
-  }
-
-  /* Main content fills remaining space, with bottom padding for fixed nav */
-  .main-content {
-    grid-row: 2;
-    grid-column: 1;
-    overflow: hidden;
-    /* Leave room for the fixed mobile-nav (56px) + safe area */
-    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   }
 
   /* Mobile bottom nav — fixed, doesn't take grid space */
@@ -1989,7 +2061,7 @@ textarea.input {
 /* ═══ TABLETS (768-1023px) ════════════════════════════════════ */
 @media (min-width: 768px) and (max-width: 1023px) {
   .app-layout {
-    grid-template-columns: 44px 1fr;
+    grid-template-columns: 44px minmax(0, 1fr);
     grid-template-rows: 48px 1fr 28px;
   }
   .sidebar { padding: var(--sp-2) 0; gap: var(--sp-1); }
@@ -2010,7 +2082,7 @@ textarea.input {
 /* ═══ LAPTOPS (1024-1439px) ═══════════════════════════════════ */
 @media (min-width: 1024px) {
   .app-layout {
-    grid-template-columns: 48px 1fr;
+    grid-template-columns: 48px minmax(0, 1fr);
     grid-template-rows: 48px 1fr 28px;
   }
   .sidebar { padding: var(--sp-3) 0; }
@@ -2026,7 +2098,7 @@ textarea.input {
 
 /* ═══ ULTRA-WIDE (1920px+) ════════════════════════════════════ */
 @media (min-width: 1920px) {
-  .app-layout { grid-template-columns: 56px 1fr; }
+  .app-layout { grid-template-columns: 56px minmax(0, 1fr); }
   .sidebar-btn { width: 40px; height: 40px; }
   .sidebar-btn svg { width: 18px; height: 18px; }
   body { font-size: 14px; }
